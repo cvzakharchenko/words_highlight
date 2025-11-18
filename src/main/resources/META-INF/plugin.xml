@@ -13,7 +13,7 @@
         <applicationConfigurable
                 id="com.github.cvzakharchenko.wordshighlight.settings"
                 instance="com.github.cvzakharchenko.wordshighlight.settings.WordHighlightSettingsConfigurable"
-                displayNameKey="settings.displayName"/>
+                key="settings.displayName"/>
         <projectService serviceImplementation="com.github.cvzakharchenko.wordshighlight.highlight.WordHighlightManager"/>
     </extensions>
 
