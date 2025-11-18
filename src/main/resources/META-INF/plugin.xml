@@ -9,7 +9,28 @@
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.cvzakharchenko.wordshighlight.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
-        <postStartupActivity implementation="com.github.cvzakharchenko.wordshighlight.startup.MyProjectActivity" />
+        <applicationService serviceImplementation="com.github.cvzakharchenko.wordshighlight.settings.WordHighlightSettingsState"/>
+        <applicationConfigurable
+                id="com.github.cvzakharchenko.wordshighlight.settings"
+                instance="com.github.cvzakharchenko.wordshighlight.settings.WordHighlightSettingsConfigurable"
+                displayNameKey="settings.displayName"/>
+        <projectService serviceImplementation="com.github.cvzakharchenko.wordshighlight.highlight.WordHighlightManager"/>
     </extensions>
+
+    <actions>
+        <action
+                id="WordHighlight.HighlightUnderCaret"
+                class="com.github.cvzakharchenko.wordshighlight.actions.HighlightWordUnderCaretAction"
+                text="Highlight Word Under Caret"
+                description="Highlight the whole word under the caret in all open editors.">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        <action
+                id="WordHighlight.ShowHighlightedWords"
+                class="com.github.cvzakharchenko.wordshighlight.actions.ShowHighlightedWordsAction"
+                text="Show Highlighted Words"
+                description="Display the list of highlighted words and remove them.">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>
