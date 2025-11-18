@@ -6,6 +6,8 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.event.DocumentEvent
+import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.editor.event.EditorFactoryEvent
 import com.intellij.openapi.editor.event.EditorFactoryListener
 import com.intellij.openapi.editor.markup.EffectType
@@ -15,8 +17,11 @@ import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.project.Project
 import com.intellij.ui.ColorUtil
+import com.intellij.util.ui.update.MergingUpdateQueue
+import com.intellij.util.ui.update.Update
 import java.awt.Color
 import java.util.LinkedHashMap
+import java.util.Collections
 import java.util.concurrent.atomic.AtomicInteger
 
 @Service(Service.Level.PROJECT)
@@ -26,7 +31,17 @@ class WordHighlightManager(private val project: Project) {
     private val lock = Any()
     private val orderCounter = AtomicInteger()
     private val highlights = LinkedHashMap<String, HighlightEntry>()
+    private val documentListeners = Collections.synchronizedMap(mutableMapOf<Editor, DocumentListener>())
     private val editorFactory = EditorFactory.getInstance()
+    private val rescanQueue = MergingUpdateQueue(
+        "WordHighlightReapply",
+        150,
+        true,
+        null,
+        project,
+        null,
+        true,
+    )
 
     init {
         ApplicationManager.getApplication().messageBus.connect(project).subscribe(
@@ -38,6 +53,7 @@ class WordHighlightManager(private val project: Project) {
             override fun editorCreated(event: EditorFactoryEvent) {
                 val editor = event.editor
                 if (editor.project != project) return
+                installDocumentListener(editor)
                 applyHighlights(editor)
             }
 
@@ -50,7 +66,10 @@ class WordHighlightManager(private val project: Project) {
 
         editorFactory.allEditors
             .filter { it.project == project }
-            .forEach { applyHighlights(it) }
+            .forEach { editor ->
+                installDocumentListener(editor)
+                applyHighlights(editor)
+            }
     }
 
     fun toggleHighlight(request: HighlightRequest): HighlightResult {
@@ -149,7 +168,7 @@ class WordHighlightManager(private val project: Project) {
         TextAttributes().apply {
             backgroundColor = color
             foregroundColor = textColor()
-            effectColor = color.darker()
+            effectColor = color
             effectType = EffectType.ROUNDED_BOX
         }
 
@@ -173,6 +192,7 @@ class WordHighlightManager(private val project: Project) {
                 clearEditorHighlights(editor, entry)
             }
         }
+        removeDocumentListener(editor)
     }
 
     private fun disposeEntry(entry: HighlightEntry) {
@@ -190,6 +210,40 @@ class WordHighlightManager(private val project: Project) {
                 applyHighlightToAllEditors(entry)
             }
         }
+    }
+
+    private fun installDocumentListener(editor: Editor) {
+        if (editor.isDisposed || editor.project != project) return
+        if (documentListeners.containsKey(editor)) return
+
+        val document = editor.document
+        val listener = object : DocumentListener {
+            override fun documentChanged(event: DocumentEvent) {
+                if (event.document == document) {
+                    scheduleReapply(editor)
+                }
+            }
+        }
+        document.addDocumentListener(listener, project)
+        documentListeners[editor] = listener
+    }
+
+    private fun removeDocumentListener(editor: Editor) {
+        val listener = documentListeners.remove(editor) ?: return
+        editor.document.removeDocumentListener(listener)
+    }
+
+    private fun scheduleReapply(editor: Editor) {
+        if (editor.isDisposed || editor.project != project) return
+        if (!hasHighlights()) return
+
+        rescanQueue.queue(object : Update(editor) {
+            override fun run() {
+                if (!editor.isDisposed && editor.project == project) {
+                    applyHighlights(editor)
+                }
+            }
+        })
     }
 
     private fun projectEditors(): List<Editor> =
