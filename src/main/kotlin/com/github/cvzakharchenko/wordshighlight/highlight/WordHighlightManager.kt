@@ -148,7 +148,8 @@ class WordHighlightManager(private val project: Project) {
 
         val text = editor.document.charsSequence
         val regex = entry.pattern
-        val textAttributes = createTextAttributes(colorFor(entry))
+        val color = colorFor(entry)
+        val textAttributes = createTextAttributes(color)
         val markupModel = editor.markupModel
 
         regex.findAll(text).forEach { match ->
@@ -160,6 +161,8 @@ class WordHighlightManager(private val project: Project) {
                 textAttributes,
                 HighlighterTargetArea.EXACT_RANGE,
             )
+            highlighter.setErrorStripeMarkColor(color)
+            highlighter.errorStripeTooltip = entry.word
             entry.editorHighlighters.getOrPut(editor) { mutableListOf() }.add(highlighter)
         }
     }
