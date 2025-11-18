@@ -10,12 +10,13 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.project.DumbAware
 
 class HighlightWordUnderCaretAction : AnAction(
     MyBundle.message("action.highlightWord.text"),
     MyBundle.message("action.highlightWord.description"),
     null,
-) {
+), DumbAware {
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
 

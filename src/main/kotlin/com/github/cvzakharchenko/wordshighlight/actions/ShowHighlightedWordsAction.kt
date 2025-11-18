@@ -9,6 +9,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.components.service
 import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.project.DumbAware
 import com.intellij.ui.CollectionListModel
 import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.ScrollPaneFactory
@@ -24,16 +25,14 @@ import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.AbstractAction
-import javax.swing.JComponent
 import javax.swing.JList
 import javax.swing.ListSelectionModel
-import javax.swing.KeyStroke
 
 class ShowHighlightedWordsAction : AnAction(
     MyBundle.message("action.showHighlights.text"),
     MyBundle.message("action.showHighlights.description"),
     null,
-) {
+), DumbAware {
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
 
@@ -57,8 +56,6 @@ class ShowHighlightedWordsAction : AnAction(
             visibleRowCount = 8
         }
 
-        installWrapNavigation(list)
-
         val scrollPane = ScrollPaneFactory.createScrollPane(list).apply {
             border = JBUI.Borders.empty()
         }
@@ -79,6 +76,8 @@ class ShowHighlightedWordsAction : AnAction(
             .setMovable(true)
             .setRequestFocus(true)
             .createPopup()
+
+        installWrapNavigation(list)
 
         fun refresh(selectionIndex: Int? = null) {
             val entries = manager.getHighlights().map { HighlightListItem.Entry(it) }
@@ -118,18 +117,6 @@ class ShowHighlightedWordsAction : AnAction(
                     KeyEvent.VK_ENTER -> {
                         handleSelection()
                         e.consume()
-                    }
-                    KeyEvent.VK_UP -> {
-                        if (listModel.size > 0 && list.selectedIndex <= 0) {
-                            list.selectedIndex = listModel.size - 1
-                            e.consume()
-                        }
-                    }
-                    KeyEvent.VK_DOWN -> {
-                        if (listModel.size > 0 && list.selectedIndex == listModel.size - 1) {
-                            list.selectedIndex = 0
-                            e.consume()
-                        }
                     }
                 }
             }
@@ -181,32 +168,42 @@ class ShowHighlightedWordsAction : AnAction(
     }
 
     private fun installWrapNavigation(list: JBList<HighlightListItem>) {
-        val upAction = object : AbstractAction() {
+        fun wrapTo(index: Int) {
+            list.selectedIndex = index
+            list.ensureIndexIsVisible(index)
+        }
+
+        val actionMap = list.actionMap
+        val originalUp = actionMap.get("selectPreviousRow")
+        val originalDown = actionMap.get("selectNextRow")
+
+        actionMap.put("selectPreviousRow", object : AbstractAction() {
             override fun actionPerformed(e: java.awt.event.ActionEvent?) {
                 val size = list.model.size
                 if (size == 0) return
-                val current = list.selectedIndex.takeIf { it >= 0 } ?: 0
-                val next = if (current <= 0) size - 1 else current - 1
-                list.selectedIndex = next
-                list.ensureIndexIsVisible(next)
+                val current = list.selectedIndex
+                if (current <= 0) {
+                    wrapTo(size - 1)
+                } else {
+                    originalUp?.actionPerformed(e)
+                }
             }
-        }
+        })
 
-        val downAction = object : AbstractAction() {
+        actionMap.put("selectNextRow", object : AbstractAction() {
             override fun actionPerformed(e: java.awt.event.ActionEvent?) {
                 val size = list.model.size
                 if (size == 0) return
-                val current = list.selectedIndex.takeIf { it >= 0 } ?: -1
-                val next = if (current >= size - 1) 0 else current + 1
-                list.selectedIndex = next
-                list.ensureIndexIsVisible(next)
+                val current = list.selectedIndex
+                if (current >= size - 1) {
+                    wrapTo(0)
+                } else if (current < 0) {
+                    wrapTo(0)
+                } else {
+                    originalDown?.actionPerformed(e)
+                }
             }
-        }
-
-        list.inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_UP, 0), "wrapUp")
-        list.actionMap.put("wrapUp", upAction)
-        list.inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0), "wrapDown")
-        list.actionMap.put("wrapDown", downAction)
+        })
     }
 }
 
