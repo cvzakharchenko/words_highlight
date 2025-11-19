@@ -45,12 +45,9 @@ class HighlightWordUnderCaretAction : AnAction(
 
     private fun buildRequest(editor: Editor): WordHighlightManager.HighlightRequest? {
         val caret = editor.caretModel.currentCaret ?: return null
-        val selection = caret.selectedText?.takeIf { it.isNotBlank() && it.all { ch -> ch.isWordPart() } }
+        val selection = caret.selectedText?.takeIf { it.isNotBlank() }
         if (!selection.isNullOrBlank()) {
-            val wordAtSelection = findWordAt(editor, caret.selectionStart)
-            if (wordAtSelection != null) {
-                return WordHighlightManager.HighlightRequest(wordAtSelection)
-            }
+            return WordHighlightManager.HighlightRequest(selection)
         }
 
         val word = findWordAt(editor, caret.offset) ?: return null
