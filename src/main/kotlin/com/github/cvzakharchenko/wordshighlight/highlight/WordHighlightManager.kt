@@ -292,8 +292,12 @@ class WordHighlightManager(private val project: Project) {
 
         private fun createPattern(word: String): Regex {
             val escaped = Regex.escape(word)
-            return Regex("\\b$escaped\\b")
+            val prefix = if (word.first().isWordChar()) "\\b" else ""
+            val suffix = if (word.last().isWordChar()) "\\b" else ""
+            return Regex("$prefix$escaped$suffix")
         }
+
+        private fun Char.isWordChar(): Boolean = isLetterOrDigit() || this == '_'
     }
 }
 
